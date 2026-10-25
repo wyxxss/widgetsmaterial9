@@ -1,0 +1,31 @@
+name: Build APK
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir proj && unzip -q DuoWidget_v4.zip -d proj
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Build
+        working-directory: proj
+        run: |
+          set -o pipefail
+          gradle assembleDebug --stacktrace 2>&1 | tee ../build.log
+      - name: Collect errors
+        if: always()
+        run: grep -E "^e: |What went wrong|Could not|FAILED" -A4 build.log > errors.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result
+          path: |
+            errors.txt
+            proj/app/build/outputs/apk/debug/*.apk
