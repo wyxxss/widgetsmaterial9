@@ -5,10 +5,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unzip project
+      - name: Find project
         run: |
-          mkdir proj
-          unzip -q DuoWidget_v4.zip -d proj
+          Z=$(ls *.zip 2>/dev/null | head -n1 || true)
+          if [ -n "$Z" ]; then
+            mkdir -p proj
+            unzip -q -o "$Z" -d proj
+            S=$(find proj -name settings.gradle.kts | head -n1)
+          else
+            S=$(find . -name settings.gradle.kts | head -n1)
+          fi
+          if [ -z "$S" ]; then
+            echo "settings.gradle.kts не найден. Файлы в репозитории:"
+            ls -R | head -n 60
+            exit 1
+          fi
+          echo "ROOT=$(dirname "$S")" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -18,18 +30,23 @@ jobs:
         with:
           gradle-version: 8.11.1
       - name: Build
-        working-directory: proj
         run: |
           set -o pipefail
-          gradle assembleDebug --stacktrace 2>&1 | tee ../build.log
-      - name: Collect errors
+          cd "$ROOT"
+          gradle assembleDebug --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+      - name: Show errors
         if: always()
         run: |
-          grep -E "^e: |What went wrong|Could not|FAILED" -A4 build.log > errors.txt || true
+          {
+            echo "## Ошибки сборки"
+            echo '```'
+            grep -E "^e: |What went wrong|Could not|FAILED|error:" -A4 build.log 2>/dev/null | head -n 80 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: result
           path: |
-            errors.txt
-            proj/app/build/outputs/apk/debug/*.apk
+            build.log
+            **/app/build/outputs/apk/debug/*.apk
