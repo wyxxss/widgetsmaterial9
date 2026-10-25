@@ -5,7 +5,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir proj && unzip -q DuoWidget_v4.zip -d proj
+      - name: Unzip project
+        run: |
+          mkdir proj
+          unzip -q DuoWidget_v4.zip -d proj
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,7 +25,8 @@ jobs:
       - name: Collect errors
         if: always()
         run: |
-          grep -E "^e: |What went wrong|Could not|FAILED" -A4 build.log > errors.txt || true      - uses: actions/upload-artifact@v4
+          grep -E "^e: |What went wrong|Could not|FAILED" -A4 build.log > errors.txt || true
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: result
